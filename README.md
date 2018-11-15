@@ -6,7 +6,8 @@ a master/slave model where the master should accept connections while slaves
 follow the master. The containers are split into a backend and frontend.
 
 Data is stored in etcd under the /msdha prefix, followed by the group
-(e.g.: /msdha/*my_msdha_group*). Locks are stored under the /msdha_locks prefix.
+(e.g.: /msdha/*my_msdha_group*). Locks are similarly stored under
+/msdha_locks/*my_msdha_group*.
 
 Variables
 =========
@@ -35,7 +36,7 @@ You can use your own Docker container as a base for MSDHA by following this proc
 
   * Replace the file `backend/start_hook` with the script that will be used to
     start your main process. The main process MUST be started with `exec` so that
-    it can receive signals
+    it can receive signals.
   * Use this build command: `docker build backend --build-arg BASE_IMAGE=<your_image>`
 
 
@@ -118,7 +119,8 @@ Other Backend Processes
 =======================
 
 The backend also has other processes that it runs. These processes are continuously
-running while ever the backend is up and start before the `pre_start` state.
+running while ever the backend is up. These processes start before the
+`pre_start` state.
 
 Node Lease Refresh
 ------------------
@@ -145,11 +147,17 @@ hooks may be required.
 The node change detection hook takes 3 arguments:
 
   1. The action:
+
     * `init`: The initial state of the mentioned node when this backend started
     * `PUT`: An add or update for a node
     * `DELETE`: The node has been removed
   1. The node name
   1. The node state (empty for DELETE)
+
+The node change detection hook is run on every node change, but only one
+invocation of the node change detection hook is run at a time. If a node rapidly
+changes state (such as during start-up), the node change detection hook will be
+run for each state change.
 
 To assist with processing, the file `/run/msdha/is_master` will exist if this
 backend is the current master node.
@@ -188,3 +196,4 @@ The following is a list of areas where things could go wrong if you're not caref
     time. See the appropriate section for more detail.
   * If you set the backend container's hostname, you MUST set `MSDHA_NAME` to the
     container name. Docker's DNS will not resolve the hostname you set.
+  * If a container looses connection to etcd, it will gracefully stop.
