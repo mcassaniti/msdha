@@ -18,26 +18,13 @@ check_inputs() {
 }
 
 etcd_watchdog_loop() {
-  local connected=1
-  while (true) ; do
-    local node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL 2>/dev/null | awk '{ print $2 }')"
+  local node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
 
-    if [ -n "$node_lease" ] ; then
-      if [ $connected -eq 0 ] ; then
-        echo "MSDHA: Connected to etcd"
-        connected=1
-      fi
+  # Will block here
+  $MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
 
-      # Will block here
-      $MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
-
-      echo "MSDHA: Lost connection to etcd"
-      connected=0
-      update_master "$MSDHA_MASTER_DEFAULT"
-    fi
-
-    sleep "$MSDHA_TTL"
-  done
+  echo "MSDHA: Lost connection to etcd. Shutting down."
+  kill 1
 }
 
 node_change_detect_loop() {
