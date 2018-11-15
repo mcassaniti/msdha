@@ -147,10 +147,9 @@ hooks may be required.
 The node change detection hook takes 3 arguments:
 
   1. The action:
-
-    * `init`: The initial state of the mentioned node when this backend started
-    * `PUT`: An add or update for a node
-    * `DELETE`: The node has been removed
+      * `init`: The initial state of the mentioned node when this backend started
+      * `PUT`: An add or update for a node
+      * `DELETE`: The node has been removed
   1. The node name
   1. The node state (empty for DELETE)
 
