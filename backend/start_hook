@@ -1,0 +1,4 @@
+#!/bin/sh
+
+echo "ERROR: The default start hook and must be replaced"
+exit 1

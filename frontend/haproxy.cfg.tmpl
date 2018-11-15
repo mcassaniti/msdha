@@ -1,0 +1,6 @@
+listen main
+  mode tcp
+  option tcpka
+  timeout connect 2000ms
+  bind *:BACKEND_PORT
+  server default BACKEND_MASTER:BACKEND_PORT
