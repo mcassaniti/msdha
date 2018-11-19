@@ -2,8 +2,6 @@
 
 MSDHA_STATE_DIR="/run/msdha"
 MSDHA_TTL_DEFAULT=10
-# This IP should be unreachable. haproxy needs an IP to start, so use this IP.
-MSDHA_MASTER_DEFAULT="169.254.254.1"
 
 do_error() {
   echo "MSDHA ERROR: $1"
@@ -106,9 +104,10 @@ else
   exit 1
 fi
 
+# Get a lease
 node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
 
-# Will block here
+# Will block here keeping lease alive
 $MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
 
 echo "MSDHA: Lost connection to etcd. Shutting down."
