@@ -60,7 +60,7 @@ node_change_detect_loop() {
         [ "$line" = "master" -a "$(cat "$MSDHA_STATE_DIR/current_master")" != "$node" ] && update_master "$node"
 
         # Master removed
-        [ -z "$line" -a "$(cat "$MSDHA_STATE_DIR/current_master")" = "$node" ] && update_master "$MSDHA_MASTER_DEFAULT"
+        [ -z "$line" -a "$(cat "$MSDHA_STATE_DIR/current_master")" = "$node" ] && update_master
 
         ;;
     esac
@@ -75,10 +75,15 @@ update_master() {
   sed s/'BACKEND_PORT'/"$MSDHA_PORT"/ \
   > /haproxy.cfg
 
-  echo "MSDHA: Backend now $1"
   echo -n "$1" > "$MSDHA_STATE_DIR/current_master"
   [ -f /run/haproxy.pid ] && killall haproxy > /dev/null
-  haproxy -f /haproxy.cfg -p /run/haproxy.pid
+  if [ -z $1 ] ; then
+    echo "MSDHA: Backend removed and proxy stopped"
+    rm -f /run/haproxy.pid
+  else
+    haproxy -f /haproxy.cfg -p /run/haproxy.pid
+    echo "MSDHA: Backend now $1"
+  fi
 }
 
 ### Initialization ###
