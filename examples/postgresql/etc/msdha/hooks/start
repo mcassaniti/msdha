@@ -1,7 +1,9 @@
 #!/bin/sh
 
 mkdir /run/postgresql
-chown postgres:postgres /run/postgresql
-chmod 755 /run/postgresql
-
-exec su-exec postgres postgres
+if [ $(id -u) -eq 0 ] ; then
+  chown postgres:postgres /run/postgresql
+  exec su-exec postgres postgres
+else
+  exec postgres
+fi

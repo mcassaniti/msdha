@@ -2,8 +2,7 @@
 
 set -e
 
-mkdir -p /var/lib/postgresql/data
-cd /var/lib/postgresql/data
+cd $PGDATA
 rm -rf *
 while [ ! -f /archives/base/cur/backup.done ] ; do
   sleep 1
@@ -22,3 +21,5 @@ cat /recovery.conf.tmpl | \
 
 chown postgres:postgres . -R
 chmod 700 .
+
+chown postgres:postgres recovery.conf

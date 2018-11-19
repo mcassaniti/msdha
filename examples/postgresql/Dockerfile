@@ -1,5 +1,6 @@
 FROM msdha-backend
 
 ENV PGDATA=/var/lib/postgresql/data
-RUN apk add --no-cache postgresql su-exec gzip
+VOLUME /var/lib/postgresql/data
+RUN apk add --no-cache postgresql su-exec
 ADD . /

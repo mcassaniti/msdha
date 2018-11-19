@@ -3,13 +3,21 @@
 set -e
 
 # Promote
-su-exec postgres pg_ctl promote --wait
+PG_BKP_CMD=""
+if [ $(id -u) -eq 0 ] ; then
+  su-exec postgres pg_ctl promote --wait
+  PG_BPK_CMD="su-exec postgres pg_basebackup"
+else
+  pg_ctl promote --wait
+  PG_BPK_CMD="pg_basebackup"
+fi
 
 # Take an immediate backup
 rm -rf /archives/base/bak
 mv /archives/base/cur /archives/base/bak
 mkdir /archives/base/cur
-su-exec postgres pg_basebackup \
+[ $(id -u) -eq 0 ] && chown postgres:postgres /archives/base/cur
+$PG_BPK_CMD \
   --format tar \
   --pgdata /archives/base/cur \
   --gzip

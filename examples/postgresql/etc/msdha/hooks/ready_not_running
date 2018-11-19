@@ -1,5 +1,5 @@
 #!/bin/sh
 
-while [ ! -f /var/lib/postgresql/recovery.done ] ; do
+while [ ! -f /run/postgresql/recovery.done ] ; do
   sleep 1
 done
