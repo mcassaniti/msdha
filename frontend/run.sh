@@ -17,16 +17,6 @@ check_inputs() {
   [ -z $MSDHA_PORT ]  && do_error "No MSDH port provided"
 }
 
-etcd_watchdog_loop() {
-  local node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
-
-  # Will block here
-  $MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
-
-  echo "MSDHA: Lost connection to etcd. Shutting down."
-  kill 1
-}
-
 node_change_detect_loop() {
   local current_rev="$($MSDHA_ETCD_CMD get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
 
@@ -87,7 +77,8 @@ update_master() {
 
   echo "MSDHA: Backend now $1"
   echo -n "$1" > "$MSDHA_STATE_DIR/current_master"
-  [ -z "$2" ] && killall -SIGHUP haproxy > /dev/null
+  [ -f /run/haproxy.pid ] && killall haproxy > /dev/null
+  haproxy -f /haproxy.cfg -p /run/haproxy.pid
 }
 
 ### Initialization ###
@@ -97,17 +88,8 @@ export ETCDCTL_API=3
 export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
 export MSDHA_ETCD_CMD="etcdctl --endpoints $ETCD_URL"
 
-# Run background process
-case "$1" in
-  "node_change_detect") node_change_detect_loop ; exit $?;;
-  "etcd_watchdog")      etcd_watchdog_loop ; exit $?;;
-esac
-
-# Set an initial master
-update_master "$MSDHA_MASTER_DEFAULT" "NO_RELOAD"
-
-# Spawn background processes
-$0 "etcd_watchdog" &
+# Run background process and spawn background process
+[ "$1" == "node_change_detect" ] && node_change_detect_loop
 $0 "node_change_detect" &
 
 ### MAIN ###
@@ -119,8 +101,10 @@ else
   exit 1
 fi
 
-# MAIN PROCESS #
-while [ ! -f /haproxy.cfg ] ; do
-  sleep 1
-done
-exec /usr/sbin/haproxy -db -V -f /haproxy.cfg
+node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
+
+# Will block here
+$MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
+
+echo "MSDHA: Lost connection to etcd. Shutting down."
+kill 1
