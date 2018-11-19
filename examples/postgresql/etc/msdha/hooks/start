@@ -1,0 +1,7 @@
+#!/bin/sh
+
+mkdir /run/postgresql
+chown postgres:postgres /run/postgresql
+chmod 755 /run/postgresql
+
+exec su-exec postgres postgres

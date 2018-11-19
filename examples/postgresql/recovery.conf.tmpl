@@ -1,0 +1,7 @@
+standby_mode = on
+restore_command = 'gunzip < /archives/wal/%f > %p'
+recovery_target_timeline = 'latest'
+recovery_end_command = 'touch /var/lib/postgresql/recovery.done'
+
+# Used for streaming log replication
+primary_conninfo = 'host=PGSQL_FRONTEND_NAME port=5432 user=PGSQL_RECOVERY_USER password=PGSQL_RECOVERY_PASS'

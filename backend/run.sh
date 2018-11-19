@@ -27,7 +27,7 @@ etcd_set_state() {
 
 run_hook() {
   if [ -x /etc/msdha/hooks/"$1" ] ; then
-    /etc/msdha/hooks/"$1" || do_error "MSDHA: Hook $1 failed"
+    /etc/msdha/hooks/"$1" || do_error "Hook $1 failed"
   fi
 }
 

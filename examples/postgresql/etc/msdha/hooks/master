@@ -1,0 +1,20 @@
+#!/bin/sh
+
+set -e
+
+# Promote
+su-exec postgres pg_ctl promote --wait
+
+# Take an immediate backup
+rm -rf /archives/base/bak
+mv /archives/base/cur /archives/base/bak
+mkdir /archives/base/cur
+su-exec postgres pg_basebackup \
+  --format tar \
+  --pgdata /archives/base/cur \
+  --gzip
+
+touch /archives/base/cur/backup.done
+
+# Cleanup any WAL archives no longer used
+pg_archivecleanup /archives/wal $(basename $(ls -t /archives/wal/*.backup | head -n1))
