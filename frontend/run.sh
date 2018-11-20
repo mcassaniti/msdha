@@ -10,20 +10,20 @@ do_error() {
 }
 
 check_inputs() {
-  [ -z $ETCD_URL ]    && do_error "No etcd URL provided"
-  [ -z $MSDHA_GROUP ] && do_error "No MSDHA group provided"
-  [ -z $MSDHA_PORT ]  && do_error "No MSDH port provided"
+  [ -z $ETCDCTL_ENDPOINTS ] && do_error "No etcd URL provided"
+  [ -z $MSDHA_GROUP ]       && do_error "No MSDHA group provided"
+  [ -z $MSDHA_PORT ]        && do_error "No MSDH port provided"
 }
 
 node_change_detect_loop() {
-  local current_rev="$($MSDHA_ETCD_CMD get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+  local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
   touch "$MSDHA_STATE_DIR/current_master"
 
   ### Initial listing of nodes ###
   local line_item="node"
   local node=""
 
-  $MSDHA_ETCD_CMD get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+  etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
     case "$line_item" in
       "node")
         node="$(basename $line)"
@@ -42,7 +42,7 @@ node_change_detect_loop() {
   local node=""
 
   # Should be 'stuck' in this loop
-  $MSDHA_ETCD_CMD watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+  etcdctl watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
     case "$line_item" in
       "action")
         action="$line"
@@ -90,7 +90,6 @@ mkdir -p "$MSDHA_STATE_DIR"
 check_inputs
 export ETCDCTL_API=3
 export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
-export MSDHA_ETCD_CMD="etcdctl --endpoints $ETCD_URL"
 
 # Run background process and spawn background process
 [ "$1" == "node_change_detect" ] && node_change_detect_loop
@@ -98,7 +97,7 @@ $0 "node_change_detect" &
 
 ### MAIN ###
 echo "MSDHA: Attempting connection to etcd"
-$MSDHA_ETCD_CMD get "msdha/$MSDHA_GROUP" > /dev/null
+etcdctl get "msdha/$MSDHA_GROUP" > /dev/null
 if [ $? -eq 0 ] ; then
   echo "MSDHA: Successful connection to etcd"
 else
@@ -106,10 +105,10 @@ else
 fi
 
 # Get a lease
-node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
+node_lease="$(etcdctl lease grant $MSDHA_TTL | awk '{ print $2 }')"
 
 # Will block here keeping lease alive
-$MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
+etcdctl lease keep-alive "$node_lease" > /dev/null
 
 echo "MSDHA: Lost connection to etcd. Shutting down."
 kill 1

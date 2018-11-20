@@ -10,13 +10,13 @@ do_error() {
 }
 
 check_inputs() {
-  [ -z $ETCD_URL ]    && do_error "No etcd URL provided"
-  [ -z $MSDHA_GROUP ] && do_error "No MSDHA group provided"
+  [ -z $ETCDCTL_ENDPOINTS ] && do_error "No etcd URL provided"
+  [ -z $MSDHA_GROUP ]       && do_error "No MSDHA group provided"
 }
 
 etcd_set_state() {
   local node_lease="$(cat $MSDHA_STATE_DIR/node_lease)"
-  $MSDHA_ETCD_CMD put --lease="$node_lease" \
+  etcdctl put --lease="$node_lease" \
     "msdha/$MSDHA_GROUP/$MSDHA_NAME" \
     "$1" \
     > /dev/null
@@ -32,24 +32,24 @@ run_hook() {
 }
 
 node_lease_refresh_loop() {
-  local node_lease="$($MSDHA_ETCD_CMD lease grant $MSDHA_TTL | awk '{ print $2 }')"
+  local node_lease="$(etcdctl lease grant $MSDHA_TTL | awk '{ print $2 }')"
   echo -n "$node_lease" > "$MSDHA_STATE_DIR/node_lease"
 
   # Will block here
-  $MSDHA_ETCD_CMD lease keep-alive "$node_lease" > /dev/null
+  etcdctl lease keep-alive "$node_lease" > /dev/null
 
   echo "MSDHA: Lost connection to etcd. Shutting down."
   kill 1
 }
 
 node_change_detect_loop() {
-  local current_rev="$($MSDHA_ETCD_CMD get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+  local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
 
   ### Initial listing of nodes ###
   local line_item="node"
   local node=""
 
-  $MSDHA_ETCD_CMD get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+  etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
     case "$line_item" in
       "node")
         node="$(basename $line)"
@@ -68,7 +68,7 @@ node_change_detect_loop() {
   local node=""
 
   # Should be 'stuck' in this loop
-  $MSDHA_ETCD_CMD watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+  etcdctl watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
     case "$line_item" in
       "action")
         action="$line"
@@ -121,14 +121,13 @@ do_main_background() {
   done
 
   # This should block trying to become a master
-  exec $MSDHA_ETCD_CMD lock "msdha_locks/${MSDHA_GROUP}" $0 "master"
+  exec etcdctl lock "msdha_locks/${MSDHA_GROUP}" $0 "master"
 }
 
 ### Initialization ###
 check_inputs
 export ETCDCTL_API=3
 export MSDHA_NAME=${MSDHA_NAME:-$HOSTNAME}
-export MSDHA_ETCD_CMD="etcdctl --endpoints $ETCD_URL"
 export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
 
 # Run these tasks if spawned as another process
@@ -143,7 +142,7 @@ esac
 ### MAIN ###
 mkdir "$MSDHA_STATE_DIR"
 echo "MSDHA: Attempting connection to etcd"
-$MSDHA_ETCD_CMD get "msdha/$MSDHA_GROUP" > /dev/null
+etcdctl get "msdha/$MSDHA_GROUP" > /dev/null
 if [ $? -eq 0 ] ; then
   echo "MSDHA: Successful connection to etcd"
 else

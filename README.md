@@ -14,13 +14,13 @@ Variables
 
 The following environment variables are supported:
 
-| Name        | Required      | Description |
-|-------------|---------------|-------------|
-| ETCD_URL    | Yes           | A full URL to etcd including username and password if required |
-| MSDHA_GROUP | Yes           | The group/cluster that these containers will belong to |
-| MSDHA_PORT  | Frontend only | The TCP port to forward traffic to on the master |
-| MSHDA_NAME  | No            | The name of this node, defaults to hostname. Must resolve by DNS from the frontend container. |
-| MSDHA_TTL   | No            | How often a node will refresh with etcd. This also determines how long a node will take to stop if it disconnects from etcd. |
+| Name              | Required      | Description |
+|-------------------|---------------|-------------|
+| ETCDCTL_ENDPOINTS | Yes           | A full URL to etcd including username and password if required |
+| MSDHA_GROUP       | Yes           | The group/cluster that these containers will belong to |
+| MSDHA_PORT        | Frontend only | The TCP port to forward traffic to on the master |
+| MSHDA_NAME        | No            | The name of this node, defaults to hostname. Must resolve by DNS from the frontend container. |
+| MSDHA_TTL         | No            | How often a node will refresh with etcd. This also determines how long a node will take to stop if it disconnects from etcd. |
 
 Backend Container
 =================
