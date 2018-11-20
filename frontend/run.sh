@@ -17,6 +17,7 @@ check_inputs() {
 
 node_change_detect_loop() {
   local current_rev="$($MSDHA_ETCD_CMD get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+  touch "$MSDHA_STATE_DIR/current_master"
 
   ### Initial listing of nodes ###
   local line_item="node"
