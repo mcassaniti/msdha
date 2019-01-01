@@ -1,6 +1,7 @@
 #!/bin/sh
 
 MSDHA_TTL_DEFAULT=10
+MSDHA_MASTER_TTL_DEFAULT=1d
 MSDHA_STATE_DIR="/run/msdha"
 
 do_error() {
@@ -96,12 +97,12 @@ master_loop() {
   echo "MSDHA: $MSDHA_NAME is now master"
   etcd_set_state "master"
 
-  while(true) ; do
-    # Essentially do nothing and keep holding the lock
-    sleep 1d
-  done
+  # Keep the lock held for this long
+  sleep ${MSDHA_MASTER_TTL:-$MSDHA_MASTER_TTL_DEFAULT}
 
-  echo "MSDHA: Stopped master loop"
+  echo "MSDHA: Exceeded master timeout. Stopping."
+  kill 1
+  exit 0
 }
 
 do_main_background() {

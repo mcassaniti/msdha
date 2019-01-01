@@ -21,6 +21,7 @@ The following environment variables are supported:
 | MSDHA_PORT        | Frontend only | The TCP port to forward traffic to on the master |
 | MSHDA_NAME        | No            | The name of this node, defaults to hostname. Must resolve by DNS from the frontend container. |
 | MSDHA_TTL         | No            | How often a node will refresh with etcd. This also determines how long a node will take to stop if it disconnects from etcd. |
+| MSDHA_MASTER_TTL  | No            | How long a backend node will maintain master status. Default is 1 day. |
 
 Backend Container
 =================
