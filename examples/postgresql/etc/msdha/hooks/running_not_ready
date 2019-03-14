@@ -1,0 +1,19 @@
+#!/bin/sh
+
+let i=0
+while (true) ; do
+  if [ $(id -u) -eq 0 ] ; then
+    state=$(su-exec postgres psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
+  else
+    state=$(psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
+  fi
+
+  [ $state = "streaming" ] && exit 0
+
+  sleep 10s
+  let i=i+1
+
+  # 900 seconds (15 minutes) have passed without moving to streaming. Fail.
+  [ $i -eq 90 ] && exit 1
+
+done
