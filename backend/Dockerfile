@@ -6,7 +6,7 @@ ENV ETCDCTL_API=3
 RUN mkdir /etc/msdha/hooks -p
 
 RUN [ -x /sbin/apk ] && apk add --no-cache curl
-# RUN latest_etcd_url="$(curl --silent --location https://api.github.com/repos/coreos/etcd/releases/latest | \
+# RUN latest_etcd_url="$(curl --silent --location https://api.github.com/repos/etcd-io/etcd/releases/latest | \
 #     grep browser_download_url | \
 #     grep linux-amd64.tar.gz\" | \
 #     awk '{ print $2 }' | \
@@ -17,8 +17,8 @@ RUN [ -x /sbin/apk ] && apk add --no-cache curl
 #   rm -rf /etcd* && \
 #   rm -f /etcd.tar.gz
 
-RUN etcd_release='3.3.10' && \
-  wget -q "https://github.com/coreos/etcd/releases/download/v$etcd_release/etcd-v${etcd_release}-linux-amd64.tar.gz" -O /etcd.tar.gz && \
+RUN etcd_release='3.3.12' && \
+  wget -q "https://github.com/etcd-io/etcd/releases/download/v$etcd_release/etcd-v${etcd_release}-linux-amd64.tar.gz" -O /etcd.tar.gz && \
   tar -xf /etcd.tar.gz -C / && \
   mv /etcd*/etcdctl /usr/bin && \
   rm -rf /etcd* && \
