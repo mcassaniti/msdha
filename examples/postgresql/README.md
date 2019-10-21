@@ -18,3 +18,7 @@ The following environment variables will need to be set:
   * `PGSQL_RECOVERY_USER`: The name of PostgreSQL recovery user
   * `PGSQL_RECOVERY_PASS`: The password for the PostgreSQL recovery user
   * `PGSQL_FRONTEND_NAME`: The container name of the frontend container or docker swarm service
+
+You will need to force the initial backend to become a master to bootstrap the
+backend setup. To do so, make sure only 1 backend is running and create the file
+`/archives/force_master`. Once the file is removed more backends can be added.
