@@ -8,7 +8,7 @@ while (true) ; do
     state=$(psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
   fi
 
-  [ "x$state" = "xstreaming" ] && exit 0
+  echo "$state" | grep -q "streaming" && exit 0
 
   sleep 10s
   let i=i+1
