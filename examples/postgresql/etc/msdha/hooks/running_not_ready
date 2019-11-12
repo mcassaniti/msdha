@@ -2,12 +2,7 @@
 
 let i=0
 while (true) ; do
-  if [ $(id -u) -eq 0 ] ; then
-    state=$(su-exec postgres psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
-  else
-    state=$(psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
-  fi
-
+  state=$(psql postgres -c 'SELECT status FROM pg_stat_wal_receiver' -t)
   echo "$state" | grep -q "streaming" && exit 0
 
   sleep 10s
@@ -17,8 +12,7 @@ while (true) ; do
   [ $i -eq 90 ] && exit 1
 
   if [ -f /archives/force_master ] ; then
-    rm /archives/force_master
+    sudo /bin/rm /archives/force_master
     exit 0
   fi
-
 done

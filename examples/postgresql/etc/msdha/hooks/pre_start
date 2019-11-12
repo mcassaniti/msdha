@@ -4,6 +4,7 @@ set -e
 
 cd $PGDATA
 rm -rf *
+chmod 700 .
 while [ ! -f /archives/base/cur/backup.done ] ; do
   sleep 1
 done
@@ -18,8 +19,3 @@ cat /recovery.conf.tmpl | \
   sed s/"PGSQL_RECOVERY_USER"/"$PGSQL_RECOVERY_USER"/ | \
   sed s/"PGSQL_RECOVERY_PASS"/"$PGSQL_RECOVERY_PASS"/ \
   > recovery.conf
-
-chown postgres:postgres . -R
-chmod 700 .
-
-chown postgres:postgres recovery.conf

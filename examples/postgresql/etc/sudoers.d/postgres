@@ -1,0 +1,5 @@
+# Allow setup of the /run directory and permissions
+postgres ALL = (root) NOPASSWD: SETENV: /setup.sh
+
+# Allow removal of the force_master file
+postgres ALL = (root) NOPASSWD: /bin/rm /archives/force_master
