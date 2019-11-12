@@ -172,6 +172,11 @@ with the Docker `--init` flag. The frontend will send any TCP traffic it receive
 on `MSDHA_PORT` to the master on `MSDHA_PORT`. No traffic is sent to slaves. You
 can run multiple frontend containers for redundancy if required.
 
+The frontend server by default runs as an unprivileged user. If your listening
+port is below 1024, you will need to set the `--user=root` option. The frontend
+is also capable of running in read-only mode. To support this, mount the `/run`
+directory as a tmpfs volume.
+
 Note: The frontend connects to the backend master by name. If you change the name
 of the backend by setting `MSDHA_NAME`, this name must resolve correctly to the
 backend within Docker.
@@ -197,3 +202,5 @@ The following is a list of areas where things could go wrong if you're not caref
   * If you set the backend container's hostname, you MUST set `MSDHA_NAME` to the
     container name. Docker's DNS will not resolve the hostname you set.
   * If a container looses connection to etcd, it will gracefully stop.
+  * If your listening port is below 1024, run the frontend container as the root
+    user.
