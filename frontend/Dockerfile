@@ -15,7 +15,7 @@ RUN [ -x /sbin/apk ] && apk add --no-cache curl
 #   rm -rf /etcd* && \
 #   rm -f /etcd.tar.gz
 
-RUN etcd_release='3.3.17' && \
+RUN etcd_release='3.4.3' && \
   wget -q "https://github.com/coreos/etcd/releases/download/v$etcd_release/etcd-v${etcd_release}-linux-amd64.tar.gz" -O /etcd.tar.gz && \
   tar -xf /etcd.tar.gz -C / && \
   mv /etcd*/etcdctl /usr/bin && \
