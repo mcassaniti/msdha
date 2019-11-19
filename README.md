@@ -31,7 +31,7 @@ etcd for its node key (`/msdha/my_msdha_group/my_node`). If the lease is lost fo
 whatever reason the backend is gracefully stopped after at most `MSDHA_TTL`
 seconds. There are a few options for building a backend container.
 
-Note: You MUST run MSDHA containers with the Docker `--init` flag.
+Note: You MUST run backend MSDHA containers with the Docker `--init` flag.
 
 You can use your own Docker container as a base for MSDHA by following this process:
 
@@ -167,10 +167,10 @@ Frontend Container
 
 The frontend container simply exposes the current master. It listens for any
 changes to the master and will begin sending traffic to the master node after
-the hook script completes on the master node. You MUST run the frontend container
-with the Docker `--init` flag. The frontend will send any TCP traffic it receives
-on `MSDHA_PORT` to the master on `MSDHA_PORT`. No traffic is sent to slaves. You
-can run multiple frontend containers for redundancy if required.
+the hook script completes on the master node. The frontend will send any TCP
+traffic it receives on `MSDHA_PORT` to the master on `MSDHA_PORT`. No traffic is
+sent to slaves. You can run multiple frontend containers for redundancy if
+required.
 
 The frontend server by default runs as an unprivileged user. If your listening
 port is below 1024, you will need to set the `--user=root` option. The frontend
@@ -189,7 +189,7 @@ The following is a list of areas where things could go wrong if you're not caref
   * Do not use MSDHA outside of Docker. The spawned processes that handle things
     such as node lease refreshing will not be stopped, causing a backend node to
     still appear as available.
-  * Make sure all containers are run with Docker's `--init` flag
+  * Make sure backend containers run with Docker's `--init` flag
   * Do not run the backend containers in the main Docker bridge or Docker swarm
     ingress networks. These networks do not support Docker's built-in DNS
     resolution and will result in the frontend not being able to resolve the

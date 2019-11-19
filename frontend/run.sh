@@ -12,7 +12,7 @@ do_error() {
 check_inputs() {
   [ -z $ETCDCTL_ENDPOINTS ] && do_error "No etcd URL provided"
   [ -z $MSDHA_GROUP ]       && do_error "No MSDHA group provided"
-  [ -z $MSDHA_PORT ]        && do_error "No MSDH port provided"
+  [ -z $MSDHA_PORT ]        && do_error "No MSDHA port provided"
 }
 
 node_change_detect_loop() {
@@ -86,9 +86,11 @@ update_master() {
 }
 
 ### Initialization ###
+
+# Run under an init process
+[ $$ -eq 1 ] && exec /sbin/tini $0
 sudo /setup.sh $MSDHA_STATE_DIR
 check_inputs
-export ETCDCTL_API=3
 export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
 
 # Run background process and spawn background process
