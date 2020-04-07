@@ -38,7 +38,8 @@ You can use your own Docker container as a base for MSDHA by following this proc
   * Replace the file `backend/start_hook` with the script that will be used to
     start your main process. The main process MUST be started with `exec` so that
     it can receive signals.
-  * Use this build command: `docker build backend --build-arg BASE_IMAGE=<your_image>`
+  * Use this build command:
+    `docker build backend --build-arg BASE_IMAGE=<your_image> --build-arg ETCD_RELEASE=<version>`
 
 
 You can also use MSDHA as a base for your own containers. MSDHA is built using
