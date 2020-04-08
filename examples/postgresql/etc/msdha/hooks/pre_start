@@ -13,9 +13,10 @@ tar -xf /archives/base/cur/pg_wal.tar.gz -C pg_wal
 rm -f *.old
 rm -f recovery.done
 
-cp /postgresql.conf .
-cat /recovery.conf.tmpl | \
+cat /postgresql.conf.tmpl | \
   sed s/"PGSQL_FRONTEND_NAME"/"$PGSQL_FRONTEND_NAME"/ | \
   sed s/"PGSQL_RECOVERY_USER"/"$PGSQL_RECOVERY_USER"/ | \
   sed s/"PGSQL_RECOVERY_PASS"/"$PGSQL_RECOVERY_PASS"/ \
-  > recovery.conf
+  > postgresql.conf
+
+touch standby.signal
