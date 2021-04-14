@@ -1,4 +1,5 @@
-FROM msdha-backend
+# The backend version is fixed so rebuilds can be properly controlled
+FROM ghcr.io/mcassaniti/msdha-backend:1
 
 ENV PGDATA=/var/lib/postgresql/data
 VOLUME /var/lib/postgresql/data
