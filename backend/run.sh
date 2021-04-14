@@ -44,46 +44,64 @@ node_lease_refresh_loop() {
 }
 
 node_change_detect_loop() {
-  local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+  touch /run/msdha/current_master
+  while (true) ; do
+    local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
 
-  ### Initial listing of nodes ###
-  local line_item="node"
-  local node=""
+    ### Initial listing of nodes ###
+    local line_item="node"
+    local node=""
 
-  etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
-    case "$line_item" in
-      "node")
-        node="$(basename $line)"
-        line_item="state"
-        ;;
-      "state")
-        [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "init" "$node" "$line"
-        line_item="node"
-        ;;
-    esac
-  done
+    etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+      case "$line_item" in
+        "node")
+          node="$(basename $line)"
+          line_item="state"
+          ;;
+        "state")
+          [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "init" "$node" "$line"
+          line_item="node"
+          ;;
+      esac
+    done
 
-  ### Node changes ###
-  local line_item="action"
-  local action=""
-  local node=""
+    ### Node changes ###
+    local line_item="action"
+    local action=""
+    local node=""
 
-  # Should be 'stuck' in this loop
-  etcdctl watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
-    case "$line_item" in
-      "action")
-        action="$line"
-        line_item="node"
-        ;;
-      "node")
-        node="$(basename $line)"
-        line_item="state"
-        ;;
-      "state")
-        [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "$action" "$node" "$line"
-        line_item="action"
-        ;;
-    esac
+    # Should be 'stuck' in this loop
+    etcdctl watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+      case "$line_item" in
+        "action")
+          action="$line"
+          line_item="node"
+          ;;
+        "node")
+          node="$(basename $line)"
+          line_item="state"
+          ;;
+        "state")
+          [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "$action" "$node" "$line"
+          line_item="action"
+
+          # Record current master
+          if [ "x$node" = "x$(cat /run/msdha/current_master)" ] ; then
+            if [ "x$line" = "xDELETE" ] ; then
+              echo > /run/msdha/current_master
+            fi
+          elif [ "x$line" = "xmaster" ] ; then
+            if [ -z "$( cat /run/msdha/current_master)" ] ; then
+              # Record current master, but only if the previous master is expired
+              echo "$node" > /run/msdha/current_master
+            fi
+          fi
+          ;;
+      esac
+    done
+
+    # Exited, probably due to a etcd leader loss. Sleep and try again.
+    sleep 0.2
   done
 }
 
@@ -92,6 +110,10 @@ master_loop() {
 
   echo "MSDHA: Got master lock. Waiting $wait seconds before taking over as master."
   sleep $wait
+  if [ -n "$(cat /run/msdha/current_master)" ] ; then
+    do_error "Node $(cat /run/msdha/current_master) is already a master"
+  fi
+
   touch "$MSDHA_STATE_DIR/is_master"
   run_hook "master"
   echo "MSDHA: $MSDHA_NAME is now master"
@@ -122,7 +144,7 @@ do_main_background() {
   done
 
   # This should block trying to become a master
-  exec etcdctl lock "msdha_locks/${MSDHA_GROUP}" $0 "master"
+  exec etcdctl lock --ttl $MSDHA_TTL "msdha_locks/${MSDHA_GROUP}" $0 "master"
 }
 
 ### Initialization ###

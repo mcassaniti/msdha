@@ -163,6 +163,9 @@ run for each state change.
 To assist with processing, the file `/run/msdha/is_master` will exist if this
 backend is the current master node.
 
+If etcd loses its leader then the node change detection will stop and attempt to
+connect again. This means that some change detection events may be lost.
+
 Frontend Container
 ==================
 
@@ -202,6 +205,10 @@ The following is a list of areas where things could go wrong if you're not caref
     time. See the appropriate section for more detail.
   * If you set the backend container's hostname, you MUST set `MSDHA_NAME` to the
     container name. Docker's DNS will not resolve the hostname you set.
-  * If a container looses connection to etcd, it will gracefully stop.
+  * If a container loses connection to etcd, it will gracefully stop. There are
+    two cases when this may happen. The container may have lost the connection
+    for watching changes in etcd. If this is the case the container will attempt
+    to reconnect and keep going. If the lease refresh fails then the container
+    will gracefully stop.
   * If your listening port is below 1024, run the frontend container as the root
     user.
