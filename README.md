@@ -45,7 +45,7 @@ You can use your own Docker container as a base for MSDHA by following this proc
 You can also use MSDHA as a base for your own containers. MSDHA is built using
 Alpine Linux.
 
-    FROM msdha-backend
+    FROM ghcr.io/mcassaniti/msdha-backend
 
     # Rest of your Dockerfile
     ...

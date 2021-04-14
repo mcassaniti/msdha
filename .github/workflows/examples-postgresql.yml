@@ -1,0 +1,26 @@
+---
+  name: Build PostgreSQL example docker container
+  on:
+    push:
+      paths:
+        - examples/postgresql/**
+      branches:
+        - master
+
+  jobs:
+    build:
+      name: Build latest PostgreSQL example
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Clone repository
+          uses: actions/checkout@v2
+
+        - name: Log into GitHub docker
+          run: docker login ghcr.io -u ${{ github.repository_owner }} -p ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Build new container
+          run: docker build examples/postgresql --build-arg ETCD_RELEASE="${ETCD_RELEASE}" --tag "ghcr.io/${{ github.repository_owner }}/msdha-backend-postgresql:${{ github.run_number }}" --tag "ghcr.io/${{ github.repository_owner }}/msdha-backend-postgresql:latest"
+
+        - name: Push new container
+          run: docker push ghcr.io/${{ github.repository_owner }}/msdha-backend-postgresql --all-tags

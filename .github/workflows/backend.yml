@@ -1,0 +1,26 @@
+---
+  name: Build backend docker container
+  on:
+    push:
+      paths:
+        - backend/**
+      branches:
+        - master
+
+  jobs:
+    build:
+      name: Build latest backend
+      runs-on: ubuntu-latest
+
+      steps:
+        - name: Clone repository
+          uses: actions/checkout@v2
+
+        - name: Log into GitHub docker
+          run: docker login ghcr.io -u ${{ github.repository_owner }} -p ${{ secrets.GITHUB_TOKEN }}
+
+        - name: Build new container
+          run: docker build backend --tag "ghcr.io/${{ github.repository_owner }}/msdha-backend:${{ github.run_number }}" --tag "ghcr.io/${{ github.repository_owner }}/msdha-backend:latest"
+
+        - name: Push new container
+          run: docker push "ghcr.io/${{ github.repository_owner }}/msdha-backend" --all-tags
