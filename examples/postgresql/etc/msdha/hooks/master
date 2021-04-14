@@ -10,6 +10,10 @@ rm -rf /archives/base/bak
 mv /archives/base/cur /archives/base/bak
 mkdir /archives/base/cur
 pg_basebackup --format tar --pgdata /archives/base/cur --gzip
+
+# Verify backup
+tar tf /archives/base/cur/base.tar.gz   >/dev/null
+tar tf /archives/base/cur/pg_wal.tar.gz >/dev/null
 touch /archives/base/cur/backup.done
 
 # Cleanup any WAL archives no longer used
