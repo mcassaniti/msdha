@@ -1,13 +1,8 @@
 FROM alpine
-ARG ETCD_RELEASE
+ARG ETCD_RELEASE=3.4.15
 
 ENV TINI_KILL_PROCESS_GROUP=1
 ENV ETCDCTL_API=3
-
-RUN if [ "x" = "x$ETCD_RELEASE" ] ; then \
-    echo "Set the etcd release during build as --build-arg ETCD_RELEASE=<version>" ; \
-    exit 1 ; \
-  fi
 
 # Add packages, user and sudo support
 RUN apk --no-cache add haproxy curl sudo tini && \
