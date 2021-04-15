@@ -6,8 +6,24 @@ a master/slave model where the master should accept connections while slaves
 follow the master. The containers are split into a backend and frontend.
 
 Data is stored in etcd under the /msdha prefix, followed by the group
-(e.g.: /msdha/*my_msdha_group*). Locks are similarly stored under
-/msdha_locks/*my_msdha_group*.
+(e.g.: /msdha/*my_msdha_group*).
+
+GitHub
+======
+
+If you make use of MSDHA then please add a star on the GitHub repository. You're
+also welcome to raise an issue if you have difficulties. The repository URL is
+https://github.com/mcassaniti/msdha.
+
+There are Docker images pre-built and available as below. The image versions are
+sequentially numbered.
+
+  * msdha-backend: `ghcr.io/mcassaniti/msdha-backend`
+  * msdha-frontend: `ghcr.io/mcassaniti/msdha-frontend`
+  * msdha-backend-postgresql: The example PostgreSQL container `ghcr.io/mcassaniti/msdha-backend-postgresql`
+
+I'm unaware who uses MSDHA, but I am currently using this for my production
+PostgreSQL cluster.
 
 Variables
 =========
@@ -56,7 +72,7 @@ You can add MSDHA directly to your container. In this case you will need to:
     along with setting the environment variable `TINI_KILL_PROCESS_GROUP=1`
   * Provide a start hook at `/etc/msdha/hooks/start` that will start your main
     process under `exec`
-  * Add etcdctl from https://github.com/coreos/etcd
+  * Add etcdctl from https://github.com/etcd-io/etcd
 
 The backend will run through the following states, calling a hook in
 `/etc/msdha/hooks` for each state. A failure of any hook will cause the backend
@@ -96,13 +112,13 @@ Ready
 -----
 
 In this state the backend and main process are completely ready to be promoted to
-master at any time. The backend will now attempt to take over the master lock.
+master at any time. The backend will now be allowed to take over as master.
 
 Master
 ------
 
 In this state the backend has been promoted to master by gaining the master lock
-in etcd. Note that only one backend at a time can ever hold the lock. The
+in etcd. Note that only one backend at a time can maintain the master state. The
 backend will wait **twice** the `MSDHA_TTL` value before running the hook script
 for master promotion. The following scenario could happen, which is why the wait
 has been added:
@@ -124,16 +140,22 @@ The backend also has other processes that it runs. These processes are continuou
 running while ever the backend is up. These processes start before the
 `pre_start` state.
 
-Node Lease Refresh
-------------------
+Since MSDHA is written as a POSIX shell script there is no option for running
+multiple tasks as threads. While this goes against the one process per container
+mantra of Docker, running multiple related tasks is reasonable within the same
+Docker container. MSDHA will instead create a process for every task that should
+run concurrently with other tasks.
+
+Lease Refresh
+-------------
 
 The backend node will have a key stored in etcd at `/msdha/my_msdha_group/node`
 that contains the node state. The node will make sure the lease on this key is
 continually refreshed. If the lease cannot be refreshed, the node will gracefully
 terminate.
 
-Node Change Detection
----------------------
+Change Detection
+----------------
 
 The backend node can notify when any node (including itself) changes state. A hook
 at `/etc/msdha/hooks/node_state_change` can be run whenever a node change occurs.
@@ -161,20 +183,27 @@ changes state (such as during start-up), the node change detection hook will be
 run for each state change.
 
 To assist with processing, the file `/run/msdha/is_master` will exist if this
-backend is the current master node.
+backend is the current master node. There is also `/run/msdha/current_master`.
 
 If etcd loses its leader then the node change detection will stop and attempt to
-connect again. This means that some change detection events may be lost.
+connect again. The very last change may be replayed.
+
+Watcher
+-------
+
+Due to some limitations of the POSIX shell, a separate etcd watcher process is
+created to feed the change detection process. This process will be restarted if
+the etcd connection is dropped.
 
 Frontend Container
 ==================
 
 The frontend container simply exposes the current master. It listens for any
-changes to the master and will begin sending traffic to the master node after
-the hook script completes on the master node. The frontend will send any TCP
-traffic it receives on `MSDHA_PORT` to the master on `MSDHA_PORT`. No traffic is
-sent to slaves. You can run multiple frontend containers for redundancy if
-required.
+changes to the master and will begin sending traffic to the master node
+__before__ the hook script completes on the master node. The frontend will send
+any TCP traffic it receives on `MSDHA_PORT` to the master on `MSDHA_PORT`. No
+traffic is sent to slaves. You can run multiple frontend containers for
+redundancy if required.
 
 The frontend server by default runs as an unprivileged user. If your listening
 port is below 1024, you will need to set the `--user=root` option. The frontend
@@ -193,7 +222,8 @@ The following is a list of areas where things could go wrong if you're not caref
   * Do not use MSDHA outside of Docker. The spawned processes that handle things
     such as node lease refreshing will not be stopped, causing a backend node to
     still appear as available.
-  * Make sure backend containers run with Docker's `--init` flag
+  * Make sure backend containers run with Docker's `--init` flag. The default
+    Docker images will automatically use create an init process as required.
   * Do not run the backend containers in the main Docker bridge or Docker swarm
     ingress networks. These networks do not support Docker's built-in DNS
     resolution and will result in the frontend not being able to resolve the

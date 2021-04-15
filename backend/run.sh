@@ -32,7 +32,7 @@ run_hook() {
   fi
 }
 
-node_lease_refresh_loop() {
+lease_refresh() {
   local node_lease="$(etcdctl lease grant $MSDHA_TTL | awk '{ print $2 }')"
   echo -n "$node_lease" > "$MSDHA_STATE_DIR/node_lease"
 
@@ -43,35 +43,76 @@ node_lease_refresh_loop() {
   kill 1
 }
 
-node_change_detect_loop() {
-  touch /run/msdha/current_master
-  while (true) ; do
-    local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+wait_master() {
+  # Wait until the initial load of the state of all nodes
+  while [ -f "$MSDHA_STATE_DIR/disable_master" ] ; do
+    sleep 1
+  done
 
-    ### Initial listing of nodes ###
-    local line_item="node"
-    local node=""
+  if [ -z "$(cat $MSDHA_STATE_DIR/current_master)" ] ; then
+    # There is no master at initial startup so try to become master
+    try_promote &
+  fi
+}
 
-    etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
-      case "$line_item" in
-        "node")
-          node="$(basename $line)"
-          line_item="state"
-          ;;
-        "state")
+watcher() {
+  etcdctl watch --rev="$1" --prefix "msdha/$MSDHA_GROUP" > "$MSDHA_STATE_DIR/watch_fifo"
+}
+
+change_detect() {
+  touch "$MSDHA_STATE_DIR/current_master"
+  local current_rev=""
+
+  current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
+
+  ### Initial listing of nodes ###
+  local line_item="node"
+  local node=""
+  local ignore=""
+
+  etcdctl get --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+    case "$line_item" in
+      "node")
+        node="$(basename $line)"
+        line_item="state"
+        if [ $(basename $(dirname "$line") ) = "_promote_lock" ] ; then
+          # Do not process the _promote_lock
+          ignore="yes"
+        fi
+        ;;
+      "state")
+        if [ -z "$ignore" ] ; then
           [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "init" "$node" "$line"
           line_item="node"
-          ;;
-      esac
-    done
+
+          if [ "x$line" = "xmaster" ] ; then
+            echo -n "$node" > "$MSDHA_STATE_DIR/current_master"
+          fi
+        else
+          ignore=""
+        fi
+        ;;
+    esac
+  done
+
+  # Allow any attempts to become master at initial startup
+  rm "$MSDHA_STATE_DIR/disable_master"
+
+  while (true) ; do
+    # A fifo and separate process is required so that a sub-shell is not used.
+    # It's a bit ugly but it works.
+    [ -p "$MSDHA_STATE_DIR/watch_fifo" ] && rm "$MSDHA_STATE_DIR/watch_fifo"
+    mkfifo "$MSDHA_STATE_DIR/watch_fifo"
 
     ### Node changes ###
     local line_item="action"
     local action=""
     local node=""
+    local ignore=""
+    $0 watcher $current_rev &
 
     # Should be 'stuck' in this loop
-    etcdctl watch --rev="$current_rev" --prefix "msdha/$MSDHA_GROUP" | while read line ; do
+    while read -r line ; do
       case "$line_item" in
         "action")
           action="$line"
@@ -80,56 +121,85 @@ node_change_detect_loop() {
         "node")
           node="$(basename $line)"
           line_item="state"
+          if [ $(basename $(dirname "$line") ) = "_promote_lock" ] ; then
+            # Do not process the _promote_lock
+            ignore="yes"
+          fi
           ;;
         "state")
-          [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "$action" "$node" "$line"
           line_item="action"
+          # Record the revision again in case the watch is dropped
+          current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
 
-          # Record current master
-          if [ "x$node" = "x$(cat /run/msdha/current_master)" ] ; then
-            if [ "x$line" = "xDELETE" ] ; then
-              echo > /run/msdha/current_master
+          if [ -z "$ignore" ] ; then
+            [ -x /etc/msdha/hooks/node_state_change ] && /etc/msdha/hooks/node_state_change "$action" "$node" "$line"
+
+            # Update current master
+            if [ "x$node" = "x$(cat "$MSDHA_STATE_DIR/current_master")" ] ; then
+              if [ "x$action" = "xDELETE" ] ; then
+                echo -n > "$MSDHA_STATE_DIR/current_master"
+
+                # Master dropped so attempt promotion
+                try_promote &
+              fi
+            elif [ "x$line" = "xmaster" ] ; then
+              echo -n "$node" > "$MSDHA_STATE_DIR/current_master"
             fi
-          elif [ "x$line" = "xmaster" ] ; then
-            if [ -z "$( cat /run/msdha/current_master)" ] ; then
-              # Record current master, but only if the previous master is expired
-              echo "$node" > /run/msdha/current_master
-            fi
+          else
+            ignore=""
           fi
           ;;
       esac
-    done
+    done < "$MSDHA_STATE_DIR/watch_fifo"
 
     # Exited, probably due to a etcd leader loss. Sleep and try again.
-    sleep 0.2
+    sleep 1
   done
 }
 
-master_loop() {
-  let wait=${MSDHA_TTL}*2
-
-  echo "MSDHA: Got master lock. Waiting $wait seconds before taking over as master."
-  sleep $wait
-  if [ -n "$(cat /run/msdha/current_master)" ] ; then
-    do_error "Node $(cat /run/msdha/current_master) is already a master"
+try_promote() {
+  # Promote under a lock
+  if [ ! -f "$MSDHA_STATE_DIR/disable_master" ] ; then
+    let wait=${MSDHA_TTL}*2
+    echo "MSDHA: Master lost. Waiting $wait seconds before attempting promotion."
+    sleep $wait
+    exec etcdctl lock --ttl ${MSDHA_TTL} "msdha/${MSDHA_GROUP}/_promote_lock" $0 promote
   fi
+}
 
-  touch "$MSDHA_STATE_DIR/is_master"
-  run_hook "master"
-  echo "MSDHA: $MSDHA_NAME is now master"
-  etcd_set_state "master"
+promote () {
+  # Wait in case another node has already been promoted. This will allow the
+  # node change detection to write the node out.
+  sleep 2
 
-  # Keep the lock held for this long
+  if [ -z "$(cat $MSDHA_STATE_DIR/current_master)" ] ; then
+    # There is no master node
+    echo -n "$MSDHA_NAME" > "$MSDHA_STATE_DIR/current_master"
+    touch "$MSDHA_STATE_DIR/is_master"
+    run_hook "master"
+    echo "MSDHA: $MSDHA_NAME is now master"
+    etcd_set_state "master"
+
+    $0 promote_timeout &
+  fi
+}
+
+promote_timeout() {
+  # Remain promoted for this long
   sleep ${MSDHA_MASTER_TTL:-$MSDHA_MASTER_TTL_DEFAULT}
-
   echo "MSDHA: Exceeded master timeout. Stopping."
+
+  # Prevent becoming a master during shutdown
+  touch "$MSDHA_STATE_DIR/disable_master"
+
   kill 1
   exit 0
 }
 
-do_main_background() {
-  $0 "node_change_detect" &
-  $0 "node_lease_refresh" &
+startup() {
+  $0 "lease_refresh" &
+  $0 "change_detect" &
+
   # This pause will make sure we have a lease
   sleep 1
 
@@ -143,8 +213,7 @@ do_main_background() {
     etcd_set_state "$state"
   done
 
-  # This should block trying to become a master
-  exec etcdctl lock --ttl $MSDHA_TTL "msdha_locks/${MSDHA_GROUP}" $0 "master"
+  $0 "wait_master" &
 }
 
 ### Initialization ###
@@ -155,10 +224,14 @@ export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
 
 # Run these tasks if spawned as another process
 case "$1" in
-  "main_background")    do_main_background      ; exit $?;;
-  "node_lease_refresh") node_lease_refresh_loop ; exit $?;;
-  "node_change_detect") node_change_detect_loop ; exit $?;;
-  "master")             master_loop ; exit $?;;
+  "startup")         startup         ; exit $?;;
+  "lease_refresh")   lease_refresh   ; exit $?;;
+  "change_detect")   change_detect   ; exit $?;;
+  "wait_master")     wait_master     ; exit $?;;
+  "try_promote")     try_promote     ; exit $?;;
+  "promote")         promote         ; exit $?;;
+  "promote_timeout") promote_timeout ; exit $?;;
+  "watcher")         watcher $2      ; exit $?;;
   "*") ;;
 esac
 
@@ -172,9 +245,13 @@ else
   exit 1
 fi
 
-# Stop the main process from starting and start the main background process
+# Disable initial master promotion until initial etcd records are read
+# Promotion to master still needs to wait until this node is in the ready state
+touch "$MSDHA_STATE_DIR/disable_master"
+
+# Stop the main process from starting and start the startup process
 touch "$MSDHA_STATE_DIR/start_wait"
-$0 main_background &
+$0 startup &
 
 while [ -f "$MSDHA_STATE_DIR/start_wait" ] ; do
   sleep 1
