@@ -22,3 +22,5 @@ The following environment variables will need to be set:
 You will need to force the initial backend to become a master to bootstrap the
 backend setup. To do so, make sure only 1 backend is running and create the file
 `/archives/force_master`. Once the file is removed more backends can be added.
+This has been added so that all backends will wait until they are streaming WAL
+updates from the master before being marked ready.
