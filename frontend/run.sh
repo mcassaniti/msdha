@@ -15,7 +15,7 @@ check_inputs() {
   [ -z $MSDHA_PORT ]        && do_error "No MSDHA port provided"
 }
 
-node_change_detect_loop() {
+change_detect() {
   local current_rev="$(etcdctl get msdha/$MSDHA_GROUP -w fields | grep Revision | awk -F ': ' '{ print $2 }')"
   touch "$MSDHA_STATE_DIR/current_master"
 
@@ -93,10 +93,6 @@ sudo /setup.sh $MSDHA_STATE_DIR
 check_inputs
 export MSDHA_TTL=${MSDHA_TTL:-$MSDHA_TTL_DEFAULT}
 
-# Run background process and spawn background process
-[ "$1" == "node_change_detect" ] && node_change_detect_loop
-$0 "node_change_detect" &
-
 ### MAIN ###
 echo "MSDHA: Attempting connection to etcd"
 etcdctl get "msdha/$MSDHA_GROUP" > /dev/null
@@ -106,11 +102,4 @@ else
   exit 1
 fi
 
-# Get a lease
-node_lease="$(etcdctl lease grant $MSDHA_TTL | awk '{ print $2 }')"
-
-# Will block here keeping lease alive
-etcdctl lease keep-alive "$node_lease" > /dev/null
-
-echo "MSDHA: Lost connection to etcd. Shutting down."
-kill 1
+change_detect
